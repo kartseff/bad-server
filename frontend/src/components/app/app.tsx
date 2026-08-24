@@ -155,11 +155,11 @@ const RouteComponent = () => {
                         element={<OrderAddress />}
                     />
                     <Route
-                        path={AppRoute.OrderAddress}
+                        path={AppRoute.OrderContacts}
                         element={<OrderContacts />}
                     />
                     <Route
-                        path={AppRoute.OrderAddress}
+                        path={AppRoute.OrderSuccess}
                         element={<OrderSuccess />}
                     />
                 </Route>

@@ -1,6 +1,6 @@
-import { unlink } from 'fs'
-import mongoose, { Document } from 'mongoose'
-import { join } from 'path'
+import { unlink } from 'fs/promises'
+import mongoose, { Document, UpdateQuery } from 'mongoose'
+import { basename, join } from 'path'
 
 export interface IFile {
     fileName: string
@@ -34,9 +34,11 @@ const cardsSchema = new mongoose.Schema<IProduct>(
         category: {
             type: String,
             required: [true, 'Поле "category" должно быть заполнено'],
+            maxlength: 50,
         },
         description: {
             type: String,
+            maxlength: 5000,
         },
         price: {
             type: Number,
@@ -48,24 +50,36 @@ const cardsSchema = new mongoose.Schema<IProduct>(
 
 cardsSchema.index({ title: 'text' })
 
-// Можно лучше: удалять старое изображением перед обновлением сущности
+const getImagePath = (fileName: string) =>
+    join(__dirname, '../public/images', basename(fileName))
+
+const removeImage = async (fileName: string) => {
+    try {
+        await unlink(getImagePath(fileName))
+    } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+            throw error
+        }
+    }
+}
+
 cardsSchema.pre('findOneAndUpdate', async function deleteOldImage() {
-    // @ts-ignore
-    const updateImage = this.getUpdate().$set?.image
+    const update = this.getUpdate() as UpdateQuery<IProduct> | null
+    const updateImage = update?.$set?.image as IFile | undefined
     const docToUpdate = await this.model.findOne(this.getQuery())
-    if (updateImage && docToUpdate) {
-        unlink(
-            join(__dirname, `../public/${docToUpdate.image.fileName}`),
-            (err) => console.log(err)
-        )
+    if (
+        updateImage &&
+        docToUpdate &&
+        updateImage.fileName !== docToUpdate.image.fileName
+    ) {
+        await removeImage(docToUpdate.image.fileName)
     }
 })
 
-// Можно лучше: удалять файл с изображением после удаление сущности
 cardsSchema.post('findOneAndDelete', async (doc: IProduct) => {
-    unlink(join(__dirname, `../public/${doc.image.fileName}`), (err) =>
-        console.log(err)
-    )
+    if (doc?.image?.fileName) {
+        await removeImage(doc.image.fileName)
+    }
 })
 
 export default mongoose.model<IProduct>('product', cardsSchema)

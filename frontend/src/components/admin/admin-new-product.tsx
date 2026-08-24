@@ -40,6 +40,10 @@ export default function AdminNewProduct() {
 
     const handleFileChange = (e: SyntheticEvent<HTMLInputElement>) => {
         if (e.currentTarget.files?.length) {
+            if (e.currentTarget.files[0].size > 5 * 1024 * 1024) {
+                toast.error('Размер файла не должен превышать 5 МБ')
+                return
+            }
             const dataFile = new FormData()
             dataFile.append('file', e.currentTarget.files[0])
 
@@ -48,19 +52,19 @@ export default function AdminNewProduct() {
                 .then((data) => {
                     setSelectedFile(data)
                 })
+                .catch((error) => toast.error(error.message))
         }
     }
 
     const handleCreateProduct = async () => {
         if (!selectedFile || !selectedCategory) {
-            console.log('Не выбран файл или категория')
             return
         }
         const dataProduct = {
             ...values,
             category: selectedCategory?.title as keyof typeof CATEGORY_CLASSES,
             image: selectedFile,
-            price: values.price ? values.price : null,
+            price: values.price ?? null,
         }
         await createProduct(dataProduct)
             .unwrap()
@@ -86,6 +90,8 @@ export default function AdminNewProduct() {
                 placeholder='Придумайте название'
                 label='Название'
                 required
+                minLength={2}
+                maxLength={30}
                 error={errors.title}
             />
             <Select
@@ -102,6 +108,7 @@ export default function AdminNewProduct() {
                 placeholder='Введите описание'
                 label='Описание'
                 required
+                maxLength={5000}
                 error={errors.description}
             />
             <Input
@@ -112,6 +119,8 @@ export default function AdminNewProduct() {
                 name='price'
                 placeholder='Введите стоимость'
                 label='Стоимость (в синапсах)'
+                min={0}
+                max={10000000}
                 error={errors.description}
             />
             <FileInput
@@ -119,7 +128,7 @@ export default function AdminNewProduct() {
                 extraClass={styles.admin__file}
                 inputRef={fileRef}
                 label='Загрузить изображение'
-                accept='image/*,.png,.jpeg,.jpg,.svg'
+                accept='.png,.jpeg,.jpg,.gif,.webp'
             />
             <Button
                 type='submit'

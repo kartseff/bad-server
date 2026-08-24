@@ -11,7 +11,6 @@ import usePagination from '../pagination/helpers/usePagination'
 import styles from './admin.module.scss'
 export default function AdminProducts() {
     const location = useLocation()
-    // const products = useSelector(productsSelector.selectProducts);
     const {
         data: products,
         totalPages,
@@ -24,8 +23,6 @@ export default function AdminProducts() {
         productsSelector.selectProducts,
         5
     )
-    console.log(products)
-
     return (
         <main className={clsx(styles.admin__products, styles.admin__container)}>
             <div className={styles.admin__header}>

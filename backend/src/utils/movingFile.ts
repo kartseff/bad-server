@@ -1,7 +1,8 @@
-import { existsSync, mkdirSync, rename } from 'fs'
+import { existsSync, mkdirSync } from 'fs'
+import { rename } from 'fs/promises'
 import { basename, join } from 'path'
 
-function movingFile(imagePath: string, from: string, to: string) {
+async function movingFile(imagePath: string, from: string, to: string) {
     const fileName = basename(imagePath)
     const imagePathTemp = join(from, fileName)
     const imagePathPermanent = join(to, fileName)
@@ -11,11 +12,7 @@ function movingFile(imagePath: string, from: string, to: string) {
         throw new Error('Ошибка при сохранении файла')
     }
 
-    rename(imagePathTemp, imagePathPermanent, (err) => {
-        if (err) {
-            throw new Error('Ошибка при сохранении файла')
-        }
-    })
+    await rename(imagePathTemp, imagePathPermanent)
 }
 
 export default movingFile

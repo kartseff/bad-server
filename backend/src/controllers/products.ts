@@ -2,6 +2,7 @@ import { NextFunction, Request, Response } from 'express'
 import { constants } from 'http2'
 import { Error as MongooseError } from 'mongoose'
 import { join } from 'path'
+import { UPLOAD_PATH, UPLOAD_PATH_TEMP } from '../config'
 import BadRequestError from '../errors/bad-request-error'
 import ConflictError from '../errors/conflict-error'
 import NotFoundError from '../errors/not-found-error'
@@ -19,6 +20,7 @@ const getProducts = async (req: Request, res: Response, next: NextFunction) => {
         const products = await Product.find({}, null, options)
         const totalProducts = await Product.countDocuments({})
         const totalPages = Math.ceil(totalProducts / Number(limit))
+        res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300')
         return res.send({
             items: products,
             pagination: {
@@ -33,6 +35,26 @@ const getProducts = async (req: Request, res: Response, next: NextFunction) => {
     }
 }
 
+// GET /product/:productId
+const getProductById = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+) => {
+    try {
+        const product = await Product.findById(req.params.productId).orFail(
+            () => new NotFoundError('Нет товара по заданному id')
+        )
+        res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300')
+        return res.status(200).send(product)
+    } catch (error) {
+        if (error instanceof MongooseError.CastError) {
+            return next(new BadRequestError('Передан не валидный ID товара'))
+        }
+        return next(error)
+    }
+}
+
 // POST /product
 const createProduct = async (
     req: Request,
@@ -44,10 +66,10 @@ const createProduct = async (
 
         // Переносим картинку из временной папки
         if (image) {
-            movingFile(
+            await movingFile(
                 image.fileName,
-                join(__dirname, `../public/${process.env.UPLOAD_PATH_TEMP}`),
-                join(__dirname, `../public/${process.env.UPLOAD_PATH}`)
+                join(__dirname, `../public/${UPLOAD_PATH_TEMP}`),
+                join(__dirname, `../public/${UPLOAD_PATH}`)
             )
         }
 
@@ -72,7 +94,6 @@ const createProduct = async (
     }
 }
 
-// TODO: Добавить guard admin
 // PUT /product
 const updateProduct = async (
     req: Request,
@@ -85,10 +106,10 @@ const updateProduct = async (
 
         // Переносим картинку из временной папки
         if (image) {
-            movingFile(
+            await movingFile(
                 image.fileName,
-                join(__dirname, `../public/${process.env.UPLOAD_PATH_TEMP}`),
-                join(__dirname, `../public/${process.env.UPLOAD_PATH}`)
+                join(__dirname, `../public/${UPLOAD_PATH_TEMP}`),
+                join(__dirname, `../public/${UPLOAD_PATH}`)
             )
         }
 
@@ -97,7 +118,7 @@ const updateProduct = async (
             {
                 $set: {
                     ...req.body,
-                    price: req.body.price ? req.body.price : null,
+                    price: req.body.price ?? null,
                     image: req.body.image ? req.body.image : undefined,
                 },
             },
@@ -120,7 +141,6 @@ const updateProduct = async (
     }
 }
 
-// TODO: Добавить guard admin
 // DELETE /product
 const deleteProduct = async (
     req: Request,
@@ -141,4 +161,10 @@ const deleteProduct = async (
     }
 }
 
-export { createProduct, deleteProduct, getProducts, updateProduct }
+export {
+    createProduct,
+    deleteProduct,
+    getProductById,
+    getProducts,
+    updateProduct,
+}

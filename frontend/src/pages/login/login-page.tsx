@@ -42,6 +42,7 @@ export default function LoginPage() {
                     type='email'
                     placeholder='Введите email'
                     label='Email'
+                    maxLength={254}
                     required
                     error={errors.email}
                 />
@@ -52,6 +53,8 @@ export default function LoginPage() {
                     type='password'
                     placeholder='Введите пароль'
                     label='Пароль'
+                    minLength={8}
+                    maxLength={72}
                     required
                     error={errors.password}
                 />
