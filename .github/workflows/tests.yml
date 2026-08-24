@@ -8,8 +8,7 @@ on:
       - review
 
 env:
-  COMPOSE_PROJECT_NAME: bad-server
-  DIR_PROJECT: ${{ github.workspace }}
+  REPO: bad-server
 
 jobs:
   tests:
