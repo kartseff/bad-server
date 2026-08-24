@@ -19,10 +19,16 @@ export const uploadFile = async (
     res: Response,
     next: NextFunction
 ) => {
-    if (!req.file) {
-        return next(new BadRequestError('Файл не загружен'))
-    }
-    try {
+  if (!req.file) {
+    return next(new BadRequestError('Файл не загружен'))
+  }
+
+  if (req.file.size <= 2 * 1024) {
+    await unlink(req.file.path).catch(() => undefined)
+    return next(new BadRequestError('Размер файла должен превышать 2 КБ'))
+  }
+
+  try {
         const metadata = await sharp(req.file.path, {
             limitInputPixels: 40_000_000,
         }).metadata()

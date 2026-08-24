@@ -103,10 +103,10 @@ export const getCustomers = async (
 
             const orderIds = orders.map((order) => order._id)
 
-            filters.$or = [
-                { name: searchRegex },
-                { lastOrder: { $in: orderIds } },
-            ]
+      filters.$or = [
+        { name: searchRegex },
+        ...orderIds.map((orderId) => ({ lastOrder: orderId })),
+      ]
         }
 
         const sort: { [key: string]: any } = {}

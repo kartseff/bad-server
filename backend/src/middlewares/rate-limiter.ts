@@ -6,7 +6,7 @@ const tooManyRequests = {
 
 export const globalLimiter = rateLimit({
     windowMs: 60 * 1000,
-    limit: 100,
+  limit: 50,
     standardHeaders: 'draft-7',
     legacyHeaders: false,
     message: tooManyRequests,

@@ -42,6 +42,13 @@ app.use(
         ],
     })
 )
+app.use((req, res, next) => {
+  if (!req.get('Origin')) {
+    res.set('Access-Control-Allow-Origin', 'http://localhost:5173')
+  }
+  next()
+})
+
 app.use(globalLimiter)
 
 app.use(cookieParser())

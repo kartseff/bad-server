@@ -31,7 +31,10 @@ const name = Joi.string().trim().min(2).max(30)
 const phone = Joi.string().trim().pattern(phoneRegExp).max(20)
 const search = Joi.string().trim().allow('').max(100)
 const page = Joi.number().integer().min(1).default(1)
-const limit = Joi.number().integer().min(1).max(100)
+const limit = Joi.number()
+  .integer()
+  .min(1)
+  .custom((value) => Math.min(value, 10))
 
 const image = Joi.object({
     fileName: Joi.string()
