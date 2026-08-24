@@ -9,6 +9,7 @@ on:
 
 env:
   COMPOSE_PROJECT_NAME: bad-server
+  DIR_PROJECT: ${{ github.workspace }}
 
 jobs:
   tests:
