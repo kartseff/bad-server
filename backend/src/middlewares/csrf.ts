@@ -3,7 +3,7 @@ import { NextFunction, Request, Response } from 'express'
 import { CSRF_SECRET, IS_PRODUCTION, ORIGIN_ALLOW } from '../config'
 import ForbiddenError from '../errors/forbidden-error'
 
-const CSRF_COOKIE = 'csrfSecret'
+const CSRF_COOKIE = '_csrf'
 const CSRF_HEADER = 'x-csrf-token'
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
 const SECRET_PATTERN = /^[a-f0-9]{64}$/
