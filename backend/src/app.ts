@@ -3,41 +3,91 @@ import cookieParser from 'cookie-parser'
 import cors from 'cors'
 import 'dotenv/config'
 import express, { json, urlencoded } from 'express'
+import helmet from 'helmet'
 import mongoose from 'mongoose'
 import path from 'path'
-import { DB_ADDRESS } from './config'
+import { DB_ADDRESS, ORIGIN_ALLOW, PORT, TRUST_PROXY } from './config'
+import { csrfProtection } from './middlewares/csrf'
 import errorHandler from './middlewares/error-handler'
+import { globalLimiter } from './middlewares/rate-limiter'
+import safeInput from './middlewares/safe-input'
 import serveStatic from './middlewares/serverStatic'
 import routes from './routes'
+import cleanupTempUploads from './utils/cleanupTempUploads'
 
-const { PORT = 3000 } = process.env
 const app = express()
+
+app.disable('x-powered-by')
+app.set('trust proxy', TRUST_PROXY)
+app.use(
+    helmet({
+        crossOriginResourcePolicy: { policy: 'cross-origin' },
+    })
+)
+app.use(
+    cors({
+        origin: (origin, callback) => {
+            if (!origin || ORIGIN_ALLOW.includes(origin)) {
+                return callback(null, true)
+            }
+            return callback(null, false)
+        },
+        credentials: true,
+        methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+        allowedHeaders: [
+            'Authorization',
+            'Content-Type',
+            'X-CSRF-Token',
+            'CSRF-Token',
+        ],
+    })
+)
+app.use((req, res, next) => {
+  if (!req.get('Origin')) {
+    res.set('Access-Control-Allow-Origin', 'http://localhost:5173')
+  }
+  next()
+})
+
+app.use(globalLimiter)
 
 app.use(cookieParser())
 
-app.use(cors())
-// app.use(cors({ origin: ORIGIN_ALLOW, credentials: true }));
-// app.use(express.static(path.join(__dirname, 'public')));
-
 app.use(serveStatic(path.join(__dirname, 'public')))
 
-app.use(urlencoded({ extended: true }))
-app.use(json())
+app.use(urlencoded({ extended: false, limit: '100kb', parameterLimit: 100 }))
+app.use(json({ limit: '100kb' }))
+app.use(safeInput)
+app.use(csrfProtection)
 
-app.options('*', cors())
 app.use(routes)
 app.use(errors())
 app.use(errorHandler)
 
-// eslint-disable-next-line no-console
-
 const bootstrap = async () => {
     try {
-        await mongoose.connect(DB_ADDRESS)
-        await app.listen(PORT, () => console.log('ok'))
+        mongoose.set('sanitizeFilter', true)
+        mongoose.set('strictQuery', true)
+        await mongoose.connect(DB_ADDRESS, {
+            maxPoolSize: 20,
+            minPoolSize: 2,
+            serverSelectionTimeoutMS: 5_000,
+        })
+        await cleanupTempUploads()
+        const cleanupTimer = setInterval(() => {
+            cleanupTempUploads().catch((error) => console.error(error))
+        }, 60 * 60 * 1000)
+        cleanupTimer.unref()
+        const server = app.listen(PORT, () => console.log('ok'))
+        server.requestTimeout = 30_000
+        server.headersTimeout = 35_000
+        server.keepAliveTimeout = 5_000
     } catch (error) {
         console.error(error)
+        process.exitCode = 1
     }
 }
 
 bootstrap()
+
+export default app

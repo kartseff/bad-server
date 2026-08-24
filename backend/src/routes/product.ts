@@ -2,6 +2,7 @@ import { Router } from 'express'
 import {
     createProduct,
     deleteProduct,
+    getProductById,
     getProducts,
     updateProduct,
 } from '../controllers/products'
@@ -10,12 +11,14 @@ import {
     validateObjId,
     validateProductBody,
     validateProductUpdateBody,
+    validateProductsQuery,
 } from '../middlewares/validations'
 import { Role } from '../models/user'
 
 const productRouter = Router()
 
-productRouter.get('/', getProducts)
+productRouter.get('/', validateProductsQuery, getProducts)
+productRouter.get('/:productId', validateObjId, getProductById)
 productRouter.post(
     '/',
     auth,

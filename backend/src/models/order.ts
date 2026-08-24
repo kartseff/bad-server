@@ -1,4 +1,3 @@
-/* eslint-disable prefer-arrow-callback */
 import mongoose, { Document, Schema, Types } from 'mongoose'
 import validator from 'validator'
 import { PaymentType, phoneRegExp } from '../middlewares/validations'
@@ -34,20 +33,22 @@ const orderSchema: Schema = new Schema(
             enum: Object.values(StatusType),
             default: StatusType.New,
         },
-        totalAmount: { type: Number, required: true },
-        products: [
-            {
-                type: Types.ObjectId,
-                ref: 'product',
+        totalAmount: { type: Number, required: true, min: 0, max: 10_000_000 },
+        products: {
+            type: [{ type: Types.ObjectId, ref: 'product' }],
+            validate: {
+                validator: (products: Types.ObjectId[]) =>
+                    products.length > 0 && products.length <= 100,
+                message: 'Заказ должен содержать от 1 до 100 товаров',
             },
-        ],
+        },
         payment: {
             type: String,
             enum: Object.values(PaymentType),
             required: true,
         },
         customer: { type: Types.ObjectId, ref: 'user' },
-        deliveryAddress: { type: String },
+        deliveryAddress: { type: String, required: true, maxlength: 300 },
         email: {
             type: String,
             required: [true, 'Поле "email" должно быть заполнено'],
@@ -67,6 +68,7 @@ const orderSchema: Schema = new Schema(
         comment: {
             type: String,
             default: '',
+            maxlength: 2000,
         },
     },
     { versionKey: false, timestamps: true }
@@ -89,16 +91,22 @@ orderSchema.pre('save', async function incrementOrderNumber(next) {
 })
 
 orderSchema.post('save', async function updateUserStats(doc) {
-    await User.findById(doc.customer).then(function updateUser(user) {
-        user?.orders.push(doc.id)
-        user?.calculateOrderStats()
-    })
+    const user = await User.findById(doc.customer)
+    if (user) {
+        user.orders.push(doc.id)
+        await user.calculateOrderStats()
+    }
 })
 
 orderSchema.post('findOneAndDelete', async function updateUserStats(order) {
-    await User.findByIdAndUpdate(order.customer, {
-        $pull: { orders: order._id },
-    }).then((user) => user?.calculateOrderStats())
+    if (order) {
+        const user = await User.findByIdAndUpdate(
+            order.customer,
+            { $pull: { orders: order._id } },
+            { new: true }
+        )
+        await user?.calculateOrderStats()
+    }
 })
 
 export default mongoose.model<IOrder>('order', orderSchema)

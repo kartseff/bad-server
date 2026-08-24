@@ -1,3 +1,9 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: 3
+
 services:
   frontend:
     build:
@@ -16,9 +22,10 @@ services:
     volumes:
       - db:/data/db
     ports:
-      - 27018:27017
+      - 127.0.0.1:27018:27017
     networks:
       - internal
+    logging: *default-logging
 
   backend:
     restart: always
@@ -30,11 +37,12 @@ services:
       - ./backend/src:/app/src
       - public:/app/src/public
     ports:
-      - 3000:3000
+      - 127.0.0.1:3000:3000
     networks:
       - internal
     depends_on:
       - mongo
+    logging: *default-logging
 
   server:
     build:
@@ -49,6 +57,7 @@ services:
       - backend
     networks:
       - internal
+    logging: *default-logging
 
 volumes:
   frontend:

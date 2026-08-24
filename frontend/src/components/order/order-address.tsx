@@ -83,7 +83,8 @@ export function OrderAddress() {
                 placeholder='Введите адрес'
                 label='Адрес доставки'
                 required
-                minLength={1}
+                minLength={5}
+                maxLength={300}
                 error={errors.address}
             />
             <div className={styles.order__buttons}>

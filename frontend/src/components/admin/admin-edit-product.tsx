@@ -46,6 +46,10 @@ export default function AdminEditProduct() {
 
     const handleFileChange = (e: SyntheticEvent<HTMLInputElement>) => {
         if (e.currentTarget.files?.length) {
+            if (e.currentTarget.files[0].size > 5 * 1024 * 1024) {
+                toast.error('Размер файла не должен превышать 5 МБ')
+                return
+            }
             const dataFile = new FormData()
             dataFile.append('file', e.currentTarget.files[0])
 
@@ -54,6 +58,7 @@ export default function AdminEditProduct() {
                 .then((data) => {
                     setSelectedFile(data)
                 })
+                .catch((error) => toast.error(error.message))
         }
     }
 
@@ -81,7 +86,7 @@ export default function AdminEditProduct() {
             ...values,
             category: selectedCategory?.title as keyof typeof CATEGORY_CLASSES,
             image: selectedFile ? selectedFile : undefined,
-            price: values.price ? values.price : null,
+            price: values.price ?? null,
         }
 
         editId &&
@@ -117,6 +122,8 @@ export default function AdminEditProduct() {
                 placeholder='Придумайте название'
                 label='Название'
                 required
+                minLength={2}
+                maxLength={30}
                 error={errors.title}
             />
             <Select
@@ -133,6 +140,7 @@ export default function AdminEditProduct() {
                 placeholder='Введите описание'
                 label='Описание'
                 required
+                maxLength={5000}
                 error={errors.description}
             />
             <Input
@@ -143,6 +151,8 @@ export default function AdminEditProduct() {
                 name='price'
                 placeholder='Введите стоимость'
                 label='Стоимость (в синапсах)'
+                min={0}
+                max={10000000}
                 error={errors.description}
             />
             <FileInput
@@ -150,7 +160,7 @@ export default function AdminEditProduct() {
                 extraClass={styles.admin__file}
                 inputRef={fileRef}
                 label='Заменить изображение'
-                accept='image/*,.png,.jpeg,.jpg,.svg'
+                accept='.png,.jpeg,.jpg,.gif,.webp'
                 fileName={currentProduct?.image.originalName}
             />
             <div className={styles.admin__buttons}>

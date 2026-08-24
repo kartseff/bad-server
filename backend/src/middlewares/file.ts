@@ -2,6 +2,9 @@ import { Request, Express } from 'express'
 import multer, { FileFilterCallback } from 'multer'
 import { mkdirSync } from 'fs'
 import { join } from 'path'
+import { randomBytes } from 'crypto'
+import { UPLOAD_PATH_TEMP } from '../config'
+import BadRequestError from '../errors/bad-request-error'
 
 type DestinationCallback = (error: Error | null, destination: string) => void
 type FileNameCallback = (error: Error | null, filename: string) => void
@@ -14,9 +17,7 @@ const storage = multer.diskStorage({
     ) => {
         const destinationPath = join(
             __dirname,
-            process.env.UPLOAD_PATH_TEMP
-                ? `../public/${process.env.UPLOAD_PATH_TEMP}`
-                : '../public'
+            `../public/${UPLOAD_PATH_TEMP}`
         )
 
         mkdirSync(destinationPath, { recursive: true })
@@ -29,7 +30,16 @@ const storage = multer.diskStorage({
         file: Express.Multer.File,
         cb: FileNameCallback
     ) => {
-        cb(null, file.originalname)
+        const extensions: Record<string, string> = {
+            'image/png': 'png',
+            'image/jpg': 'jpg',
+            'image/jpeg': 'jpg',
+            'image/gif': 'gif',
+            'image/webp': 'webp',
+        }
+        const extension = extensions[file.mimetype]
+        const name = `${Date.now()}-${randomBytes(12).toString('hex')}.${extension}`
+        cb(null, name)
     },
 })
 
@@ -38,7 +48,7 @@ const types = [
     'image/jpg',
     'image/jpeg',
     'image/gif',
-    'image/svg+xml',
+    'image/webp',
 ]
 
 const fileFilter = (
@@ -47,10 +57,21 @@ const fileFilter = (
     cb: FileFilterCallback
 ) => {
     if (!types.includes(file.mimetype)) {
-        return cb(null, false)
+        return cb(new BadRequestError('Неподдерживаемый формат изображения'))
     }
 
     return cb(null, true)
 }
 
-export default multer({ storage, fileFilter })
+export default multer({
+    storage,
+    fileFilter,
+    limits: {
+        fileSize: 5 * 1024 * 1024,
+        files: 1,
+        fields: 5,
+        fieldSize: 16 * 1024,
+        parts: 6,
+        headerPairs: 50,
+    },
+})

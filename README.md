@@ -1,1 +1,1 @@
-https://github.com/kartseff/bad-server.git
+https://github.com/kartseff/bad-server

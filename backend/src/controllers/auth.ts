@@ -2,7 +2,7 @@ import crypto from 'crypto'
 import { NextFunction, Request, Response } from 'express'
 import { constants } from 'http2'
 import jwt, { JwtPayload } from 'jsonwebtoken'
-import { Error as MongooseError } from 'mongoose'
+import { Error as MongooseError, Types } from 'mongoose'
 import { REFRESH_TOKEN } from '../config'
 import BadRequestError from '../errors/bad-request-error'
 import ConflictError from '../errors/conflict-error'
@@ -36,7 +36,7 @@ const login = async (req: Request, res: Response, next: NextFunction) => {
 const register = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const { email, password, name } = req.body
-        const newUser = new User({ email, password, name })
+        const newUser = new User({ email: email.toLowerCase(), password, name })
         await newUser.save()
         const accessToken = newUser.generateAccessToken()
         const refreshToken = await newUser.generateRefreshToken()
@@ -84,12 +84,7 @@ const getCurrentUser = async (
     }
 }
 
-// Можно лучше: вынести общую логику получения данных из refresh токена
-const deleteRefreshTokenInUser = async (
-    req: Request,
-    _res: Response,
-    _next: NextFunction
-) => {
+const consumeRefreshToken = async (req: Request) => {
     const { cookies } = req
     const rfTkn = cookies[REFRESH_TOKEN.cookie.name]
 
@@ -97,57 +92,67 @@ const deleteRefreshTokenInUser = async (
         throw new UnauthorizedError('Не валидный токен')
     }
 
-    const decodedRefreshTkn = jwt.verify(
-        rfTkn,
-        REFRESH_TOKEN.secret
-    ) as JwtPayload
-    const user = await User.findOne({
-        _id: decodedRefreshTkn._id,
-    }).orFail(() => new UnauthorizedError('Пользователь не найден в базе'))
+    let decodedRefreshTkn: JwtPayload
+    try {
+        decodedRefreshTkn = jwt.verify(rfTkn, REFRESH_TOKEN.secret, {
+            algorithms: ['HS256'],
+        }) as JwtPayload
+    } catch (_error) {
+        throw new UnauthorizedError('Не валидный токен')
+    }
+
+    if (
+        !decodedRefreshTkn.sub ||
+        !Types.ObjectId.isValid(decodedRefreshTkn.sub)
+    ) {
+        throw new UnauthorizedError('Не валидный токен')
+    }
 
     const rTknHash = crypto
         .createHmac('sha256', REFRESH_TOKEN.secret)
         .update(rfTkn)
         .digest('hex')
 
-    user.tokens = user.tokens.filter((tokenObj) => tokenObj.token !== rTknHash)
-
-    await user.save()
+    const user = await User.findOneAndUpdate(
+        {
+            _id: decodedRefreshTkn.sub,
+            'tokens.token': rTknHash,
+        },
+        { $pull: { tokens: { token: rTknHash } } },
+        { new: true }
+    ).orFail(() => new UnauthorizedError('Не валидный токен'))
 
     return user
 }
 
-// Реализация удаления токена из базы может отличаться
-// GET  /auth/logout
+// POST /auth/logout
 const logout = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        await deleteRefreshTokenInUser(req, res, next)
+        if (req.cookies[REFRESH_TOKEN.cookie.name]) {
+            await consumeRefreshToken(req).catch(() => undefined)
+        }
         const expireCookieOptions = {
             ...REFRESH_TOKEN.cookie.options,
-            maxAge: -1,
+            maxAge: 0,
         }
         res.cookie(REFRESH_TOKEN.cookie.name, '', expireCookieOptions)
         res.status(200).json({
             success: true,
         })
     } catch (error) {
-        next(error)
+        return next(error)
     }
 }
 
-// GET  /auth/token
+// POST /auth/token
 const refreshAccessToken = async (
     req: Request,
     res: Response,
     next: NextFunction
 ) => {
     try {
-        const userWithRefreshTkn = await deleteRefreshTokenInUser(
-            req,
-            res,
-            next
-        )
-        const accessToken = await userWithRefreshTkn.generateAccessToken()
+        const userWithRefreshTkn = await consumeRefreshToken(req)
+        const accessToken = userWithRefreshTkn.generateAccessToken()
         const refreshToken = await userWithRefreshTkn.generateRefreshToken()
         res.cookie(
             REFRESH_TOKEN.cookie.name,
@@ -165,24 +170,11 @@ const refreshAccessToken = async (
 }
 
 const getCurrentUserRoles = async (
-    req: Request,
+    _req: Request,
     res: Response,
-    next: NextFunction
+    _next: NextFunction
 ) => {
-    const userId = res.locals.user._id
-    try {
-        await User.findById(userId, req.body, {
-            new: true,
-        }).orFail(
-            () =>
-                new NotFoundError(
-                    'Пользователь по заданному id отсутствует в базе'
-                )
-        )
-        res.status(200).json(res.locals.user.roles)
-    } catch (error) {
-        next(error)
-    }
+    res.status(200).json(res.locals.user.roles)
 }
 
 const updateCurrentUser = async (
@@ -192,9 +184,17 @@ const updateCurrentUser = async (
 ) => {
     const userId = res.locals.user._id
     try {
-        const updatedUser = await User.findByIdAndUpdate(userId, req.body, {
-            new: true,
-        }).orFail(
+        const { name, email, phone } = req.body
+        const update = Object.fromEntries(
+            Object.entries({ name, email, phone }).filter(
+                ([, value]) => value !== undefined
+            )
+        )
+        const updatedUser = await User.findByIdAndUpdate(
+            userId,
+            { $set: update },
+            { new: true, runValidators: true }
+        ).orFail(
             () =>
                 new NotFoundError(
                     'Пользователь по заданному id отсутствует в базе'
@@ -202,6 +202,14 @@ const updateCurrentUser = async (
         )
         res.status(200).json(updatedUser)
     } catch (error) {
+        if (error instanceof MongooseError.ValidationError) {
+            return next(new BadRequestError(error.message))
+        }
+        if (error instanceof Error && error.message.includes('E11000')) {
+            return next(
+                new ConflictError('Пользователь с таким email уже существует')
+            )
+        }
         next(error)
     }
 }

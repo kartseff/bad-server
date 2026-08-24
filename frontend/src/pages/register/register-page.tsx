@@ -42,6 +42,8 @@ export default function RegisterPage() {
                     type='text'
                     placeholder='Введите имя'
                     label='Имя'
+                    minLength={2}
+                    maxLength={30}
                     required
                     error={errors.name}
                 />
@@ -52,6 +54,7 @@ export default function RegisterPage() {
                     type='email'
                     placeholder='Введите email'
                     label='Email'
+                    maxLength={254}
                     required
                     error={errors.email}
                 />
@@ -62,6 +65,8 @@ export default function RegisterPage() {
                     type='password'
                     placeholder='Введите пароль'
                     label='Пароль'
+                    minLength={8}
+                    maxLength={72}
                     required
                     error={errors.password}
                 />

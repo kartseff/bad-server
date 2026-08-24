@@ -41,7 +41,7 @@ export function OrderContacts() {
     }, [orderPersistData])
 
     const handleEditInputChange = (value: string) => {
-        setValuesForm({ ...values, comment: value })
+        setValuesForm({ ...values, comment: value.slice(0, 2000) })
     }
 
     const handleFormSubmit = (e: SyntheticEvent<HTMLFormElement>) => {
@@ -78,6 +78,7 @@ export function OrderContacts() {
                 type='email'
                 placeholder='Введите Email'
                 label='Email'
+                maxLength={254}
                 required
                 error={errors.email}
             />
@@ -89,6 +90,7 @@ export function OrderContacts() {
                 placeholder='+7 (999) 999-99-99'
                 mask='+7 (999) 999 99 99'
                 label='Телефон'
+                maxLength={20}
                 required
                 error={errors.phone}
                 component={InputMask}
